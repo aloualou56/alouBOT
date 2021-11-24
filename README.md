@@ -1,6 +1,6 @@
 # alouBOT
 alouBOT is a minecraft bot that is able to do helpful things.It is coded with mineflayer. He only need worker_treads and node to run.
-Before you run the bot make sure to change the IP (By default is set to "localhost"), and the PORT (By default is set to "25565").
+Before you run the bot make sure to change the IP (By default is set to "localhost"), and the PORT (By default is set to "25565") in the config.json file.
 If your server's IP is a domain (for example aloualou56.aternos.com) just don't change the PORT.
 
 alouBOT offers commands such as:
