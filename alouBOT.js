@@ -9,7 +9,7 @@ const scanffold = require("./plugins/mineflayer-scaffold")
 const owner = process.argv[3] || "aloualou56"
 const pass = process.argv[4]
 const armorManager = require("./plugins/mineflayer-armor-manager")
-const collectBlock = require("./plugins/mineflayer-collectblock").plugin
+
 
 
 
