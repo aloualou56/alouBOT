@@ -33,6 +33,8 @@ alouBOT features:
 
 -protection from other player's commands 
 
+-Quiet mode in config.json file
+
 
 If anyone wants to change something about the code, feel free to make a PULL REQUEST, and I will consider it.
 alouBOT may also be updated a couple of times with new features!
