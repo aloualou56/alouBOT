@@ -33,10 +33,12 @@ alouBOT features:
 
 -protection from other player's commands 
 
--Quiet mode in config.json file
+-Quiet mode in config.json file (It has 2 options "true" and "false")
 
 
 If anyone wants to change something about the code, feel free to make a PULL REQUEST, and I will consider it.
 alouBOT may also be updated a couple of times with new features!
 
 Please don't copy my project and claim it to be yours. It took me several hours! I don't mind showing it to your friends as yours, but please don't copy it and upload it to Github as your project!
+
+And also my code is somehow making the bot say the same thing 3 times in row when quiet mode is false
