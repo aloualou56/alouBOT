@@ -25,8 +25,11 @@ It needs the following packages to run:
 -> rambda                ( npm install rambda )                   _command to install the package_
 
 
+
+
 Before you run the bot make sure to change the IP (By default is set to "localhost"), and the PORT (By default is set to "25565") in the config.json file.
 If your server's IP is a domain (for example aloualou56.aternos.com) just don't change the PORT.
+
 
 alouBOT offers commands such as:
 
@@ -50,6 +53,8 @@ _tp (It teleports to you (it needs OP))
 
 _stop (stop actions)
 
+
+
 alouBOT features:
 
 -it is able to build to make it way
@@ -59,6 +64,8 @@ alouBOT features:
 -protection from other player's commands 
 
 -Quiet mode in config.json file (It has 2 options "true" and "false")
+
+
 
 
 If anyone wants to change something about the code, feel free to make a PULL REQUEST, and I will consider it.
