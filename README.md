@@ -63,7 +63,9 @@ alouBOT features:
 
 -protection from other player's commands 
 
--Quiet mode in config.json file (It has 2 options "true" and "false")
+-Quiet mode in config.json file (It has 4 options to enable it "Yes" , "yes", "Y" , "true" and 5 options to disable it "false" , "Nope" , "N" , "No" , "no" )
+
+-It also does a check before running to see if the config's options are valid
 
 
 
