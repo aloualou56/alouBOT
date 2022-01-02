@@ -1,5 +1,19 @@
 # alouBOT
-alouBOT is a minecraft bot that is able to do helpful things.It is coded with mineflayer. He only need worker_treads and node to run.
+alouBOT is a minecraft bot that is able to do helpful things.It is coded with mineflayer. He uses NODEJS to run, and npm, which 
+comes with npm the most times to install packages.
+
+It needs the following packages to run:
+-> debug                 ( npm install debug )                    _command to install the package_
+-> minecraft-protocol    ( npm install minecraft-protocol )       _command to install the package_
+-> protodef              ( npm install protodef )                 _command to install the package_
+-> vec3                  ( npm install vec3 )                     _command to install the package_
+-> prismarine-world      ( npm install prismarine-world )         _command to install the package_
+-> prismarine-entity     ( npm install prismarine-entity )        _command to install the package_
+-> prismarine-physics    ( npm install prismarine-physics )       _command to install the package_
+-> mineflayer-pathfinder ( npm install mineflayer-pathfinder )    _command to install the package_
+-> mineflayer-utils      ( npm install mineflayer-utils )         _command to install the package_
+-> rambda                ( npm install rambda )                   _command to install the package_
+
 Before you run the bot make sure to change the IP (By default is set to "localhost"), and the PORT (By default is set to "25565") in the config.json file.
 If your server's IP is a domain (for example aloualou56.aternos.com) just don't change the PORT.
 
