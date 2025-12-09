@@ -6,7 +6,7 @@ const { GoalNear, GoalBlock, GoalXZ, GoalY, GoalInvert, GoalFollow } = goals;
 const toolPlugin = require("./plugins/mineflayer-tool").plugin;
 const pvp = require("./plugins/mineflayer-pvp").plugin;
 const autoeat = require("./plugins/mineflayer-auto-eat");
-const scanffold = require("./plugins/mineflayer-scaffold");
+const scaffold = require("./plugins/mineflayer-scaffold");
 const armorManager = require("./plugins/mineflayer-armor-manager");
 const Inventory = require("./inventory");
 
@@ -20,19 +20,32 @@ try {
     process.exit(1);
 }
 
-const owner = process.argv[3] || config['OWNER'];
+const owner = process.argv[2] || process.argv[3] || config['OWNER'];
 const host = config['IP'];
-const port = config['PORT'];
-const quiet = config['QuietMODE'];
+const port = Number(config['PORT']) || 25565;
+let quiet = config['QuietMODE'];
+// Optional runtime configuration with sensible defaults
+config.TUNNEL = Object.assign({
+    maxLength: 100,
+    eatThreshold: 6,
+    stopOnLiquid: true
+}, config.TUNNEL || {});
+
+config.SWIM = Object.assign({
+    boost: true
+}, config.SWIM || {});
 
 // Validate configuration
 function validateConfig() {
-    const validQuietModes = ['Y', 'Yes', 'yes', 'true', 'N', 'No', 'no', 'Nope', 'false'];
-    
-    if (!validQuietModes.includes(quiet)) {
-        console.error('Invalid QuietMODE value. Use: Y/Yes/yes/true or N/No/no/Nope/false');
+    const q = String(quiet).toLowerCase();
+    const validQuietModes = ['y', 'yes', 'true', 'n', 'no', 'false'];
+
+    if (!validQuietModes.includes(q)) {
+        console.error('Invalid QuietMODE value. Use: Y/Yes/yes/true or N/No/no/false');
         process.exit(1);
     }
+    // normalize quiet for later use
+    quiet = q;
     
     if (!host) {
         console.error('Please enter a server IP in config.json');
@@ -69,17 +82,39 @@ let guardPos = null;
 let isTunneling = false;
 let mcData;
 let defaultMove;
+let hostileSet = new Set();
 
 // Initialize bot on spawn
 bot.once('spawn', () => {
     bot.loadPlugin(pathfinder);
     bot.loadPlugin(pvp);
-    bot.loadPlugin(scanffold);
+    bot.loadPlugin(scaffold);
     bot.loadPlugin(autoeat);
     bot.loadPlugin(toolPlugin);
     bot.loadPlugin(armorManager);
     
     mcData = require('minecraft-data')(bot.version);
+    // build a hostile entity name set from mcData where possible
+    try {
+        const entitiesByName = mcData.entitiesByName || {};
+        const heuristics = /zombie|skeleton|creeper|spider|witch|blaze|ghast|slime|enderman|silverfish|guardian|shulker|vex|vindicator|evoker|pillager|hoglin|piglin|phantom|wither|ender_dragon/i;
+        for (const name of Object.keys(entitiesByName)) {
+            const key = String(name).toLowerCase();
+            const info = entitiesByName[name] || {};
+            // Heuristic checks: known hostile names or type fields if available
+            if (heuristics.test(key)) {
+                hostileSet.add(key);
+                continue;
+            }
+            // Some mcData entries include 'type' or 'hostile' metadata; try those
+            if (info && (info.type === 'monster' || info.hostile || info.isHostile)) {
+                hostileSet.add(key);
+            }
+        }
+        console.log(`Hostile set built from mcData: ${hostileSet.size} entries`);
+    } catch (e) {
+        console.error('Failed to build hostile set from mcData:', e && e.message ? e.message : e);
+    }
     defaultMove = new Movements(bot, mcData);
     defaultMove.canDig = false;
     defaultMove.allow1by1towers = false;
@@ -137,24 +172,45 @@ bot.on('playerCollect', (collector, itemDrop) => {
 // Combat system with mob avoidance
 setInterval(() => {
     if (!isAttackingMobs || isTunneling) return;
-    
+    // Hostile detection using mcData-built set (fall back to entity.name)
     const hostileMob = bot.nearestEntity(entity => {
-        return entity.type === 'mob' && 
-               entity.kind === 'Hostile mobs' &&
-               entity.position.distanceTo(bot.entity.position) < 16;
+        try {
+            if (!entity || !entity.type || !entity.position) return false;
+            if (entity.type !== 'mob') return false;
+            const name = (entity.name || '').toLowerCase();
+            if (!name) return false;
+            // prefer mcData-derived hostileSet, otherwise try name match
+            if (hostileSet.size > 0) {
+                if (!hostileSet.has(name)) return false;
+            } else {
+                // fallback heuristic
+                if (!/zombie|skeleton|creeper|spider|witch|blaze|ghast|slime|enderman|silverfish/.test(name)) return false;
+            }
+            return entity.position.distanceTo(bot.entity.position) < 16;
+        } catch (e) {
+            return false;
+        }
     });
-    
+
     if (hostileMob) {
-        bot.pvp.attack(hostileMob);
+        try {
+            bot.pvp.attack(hostileMob);
+        } catch (e) {
+            console.error('PVP attack error:', e.message);
+        }
     }
 }, 500);
 
 // Auto-eat monitoring
 setInterval(() => {
-    if (bot.food < 14 && !bot.autoEat.isEating) {
-        bot.autoEat.eat().catch(err => {
-            console.error('Auto-eat error:', err.message);
-        });
+    try {
+        const auto = bot.autoEat;
+        if (!auto) return;
+        if (bot.food < 14 && !auto.isEating) {
+            auto.eat().catch(err => console.error('Auto-eat error:', err && err.message ? err.message : err));
+        }
+    } catch (err) {
+        console.error('Auto-eat check failed:', err && err.message ? err.message : err);
     }
 }, 1000);
 
@@ -191,16 +247,16 @@ bot.on('stoppedAttacking', () => {
 async function dig4x4Tunnel(direction, length) {
     isTunneling = true;
     const startPos = bot.entity.position.clone();
-    
-    // Direction vectors
-    const directions = {
+    const dirName = String(direction).toLowerCase();
+    // Direction forward vectors (x, z)
+    const forwardMap = {
         north: { x: 0, z: -1 },
         south: { x: 0, z: 1 },
         east: { x: 1, z: 0 },
         west: { x: -1, z: 0 }
     };
-    
-    const dir = directions[direction.toLowerCase()];
+
+    const dir = forwardMap[dirName];
     if (!dir) {
         sendMessage("Invalid direction! Use: north, south, east, west");
         isTunneling = false;
@@ -210,30 +266,61 @@ async function dig4x4Tunnel(direction, length) {
     sendMessage(`Starting 4x4 tunnel ${direction} for ${length} blocks...`);
     
     try {
-        for (let l = 0; l < length; l++) {
-            // Dig 4x4 section
-            for (let y = 0; y < 4; y++) {
-                for (let x = -1; x <= 2; x++) {
-                    const blockPos = startPos.offset(
-                        dir.x * l + (dir.z * x),
-                        y,
-                        dir.z * l + (dir.x * x)
-                    );
-                    
+        // compute right vector (perpendicular in XZ plane)
+        const right = { x: -dir.z, z: dir.x };
+        const maxLen = Math.min(length, config.TUNNEL.maxLength || 100);
+
+        for (let step = 0; step < maxLen; step++) {
+            // For each column in the 4x4 (width x height)
+            for (let h = 0; h < 4; h++) {
+                for (let w = -1; w <= 2; w++) {
+                    const bx = Math.round(startPos.x) + dir.x * step + right.x * w;
+                    const by = Math.round(startPos.y) + h;
+                    const bz = Math.round(startPos.z) + dir.z * step + right.z * w;
+                    const blockPos = vec3(bx, by, bz);
                     const block = bot.blockAt(blockPos);
-                    if (block && block.name !== 'air' && bot.canDigBlock(block)) {
-                        await bot.dig(block);
+                    if (!block) continue;
+                    const name = (block.name || '').toLowerCase();
+                    // stop on lava/water if configured
+                    if (config.TUNNEL.stopOnLiquid && (name.includes('lava') || name.includes('water'))) {
+                        sendMessage(`Stopping tunnel: detected liquid (${name}) at ${bx},${by},${bz}`);
+                        isTunneling = false;
+                        return;
+                    }
+                    if (name !== 'air') {
+                        // dig if possible
+                        try {
+                            if (typeof bot.canDigBlock === 'function') {
+                                if (bot.canDigBlock(block)) await bot.dig(block);
+                            } else {
+                                await bot.dig(block);
+                            }
+                        } catch (e) {
+                            console.error('Dig error:', e && e.message ? e.message : e);
+                        }
                     }
                 }
             }
-            
-            // Move forward
-            const nextPos = startPos.offset(dir.x * (l + 1), 0, dir.z * (l + 1));
-            await bot.pathfinder.goto(new GoalBlock(nextPos.x, nextPos.y, nextPos.z));
-            
-            // Check food level
-            if (bot.food < 6) {
-                await bot.autoEat.eat();
+
+            // Move forward one block safely
+            const nextX = Math.round(startPos.x) + dir.x * (step + 1);
+            const nextZ = Math.round(startPos.z) + dir.z * (step + 1);
+            const nextY = Math.round(startPos.y);
+            try {
+                await bot.pathfinder.goto(new GoalBlock(nextX, nextY, nextZ));
+            } catch (e) {
+                console.error('Path to next tunnel step failed:', e && e.message ? e.message : e);
+            }
+
+            // Eat if low on food
+            if (bot.food < (config.TUNNEL.eatThreshold || 6)) {
+                try {
+                    if (bot.autoEat && !bot.autoEat.isEating) {
+                        await bot.autoEat.eat();
+                    }
+                } catch (e) {
+                    console.error('Tunnel auto-eat failed:', e && e.message ? e.message : e);
+                }
             }
         }
         
@@ -252,13 +339,45 @@ function sayItems(items = bot.inventory.items()) {
 }
 
 function sendMessage(msg) {
-    const isQuiet = ['true', 'Y', 'Yes', 'yes'].includes(quiet);
+    const isQuiet = ['true', 'y', 'yes', '1'].includes(String(quiet));
     if (isQuiet) {
         console.log(msg);
     } else {
-        bot.chat(msg);
+        if (bot && bot.chat) bot.chat(msg);
+        else console.log(msg);
     }
 }
+
+// Swim boost: when in water, try to swim faster by holding forward and jump
+let swimActive = false;
+setInterval(() => {
+    try {
+        if (!config.SWIM || !config.SWIM.boost) {
+            if (swimActive) {
+                bot.setControlState('forward', false);
+                bot.setControlState('jump', false);
+                swimActive = false;
+            }
+            return;
+        }
+        const pos = bot.entity && bot.entity.position;
+        if (!pos) return;
+        const block = bot.blockAt(pos);
+        const inWater = block && String(block.name).toLowerCase().includes('water');
+        if (inWater) {
+            // engage swim controls
+            bot.setControlState('forward', true);
+            bot.setControlState('jump', true);
+            swimActive = true;
+        } else if (swimActive) {
+            bot.setControlState('forward', false);
+            bot.setControlState('jump', false);
+            swimActive = false;
+        }
+    } catch (e) {
+        // non-fatal
+    }
+}, 500);
 
 // Command handler
 bot.on("chat", async (username, message) => {
