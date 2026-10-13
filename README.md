@@ -202,15 +202,6 @@ node alouBOT.js
 - Βεβαιωθείτε ότι το `OWNER` είναι το όνομα χρήστη σας στο παιχνίδι.
 - Αν οι εντολές δεν δουλεύουν, ελέγξτε τα δικαιώματα συνομιλίας και το `QuietMODE`.
 
----
-
-If you want, I can:
-
-- split this into two files (`README_en.md` and `README_gr.md`),
-- shorten or expand any section, or
-- apply small edits to `alouBOT.js` related to configuration notes.
-
-Tell me which format you prefer and I will update accordingly.
 
 
 
